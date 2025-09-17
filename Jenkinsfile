@@ -16,25 +16,27 @@ pipeline {
             }
         }
 
-        stage('Build & Push Image') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'docker-hub',    // Jenkins credential ID
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )]) {
-                        bat """
-                            echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                            docker build -t %DOCKER_IMAGE%:${BUILD_NUMBER} -t %DOCKER_IMAGE%:latest .
-                            docker push %DOCKER_IMAGE%:${BUILD_NUMBER}
-                            docker push %DOCKER_IMAGE%:latest
-                        """
-                    }
-                }
+       stage('Build & Push Image') {
+    steps {
+        script {
+            withCredentials([usernamePassword(
+                credentialsId: 'docker-hub',
+                usernameVariable: 'DOCKER_USER',
+                passwordVariable: 'DOCKER_PASS'
+            )]) {
+                bat """
+                    echo %DOCKER_PASS% > pass.txt
+                    docker login -u %DOCKER_USER% --password-stdin < pass.txt
+                    del pass.txt
+
+                    docker build -t %DOCKER_IMAGE%:${BUILD_NUMBER} -t %DOCKER_IMAGE%:latest .
+                    docker push %DOCKER_IMAGE%:${BUILD_NUMBER}
+                    docker push %DOCKER_IMAGE%:latest
+                """
             }
         }
-
+    }
+}
         stage('Deploy') {
             steps {
                 script {
