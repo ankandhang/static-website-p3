@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "static-website-p3"
+        DOCKER_IMAGE = "ankan2004/static-website-p3"   // DockerHub repo (must be lowercase)
     }
 
     stages {
@@ -20,14 +20,15 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(
-                        credentialsId: 'docker-hub',
+                        credentialsId: 'docker-hub',    // Jenkins credential ID
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
                         bat """
-                            docker login -u %DOCKER_USER% -p %DOCKER_PASS%
-                            docker build -t %DOCKER_USER%/${IMAGE_NAME}:${BUILD_NUMBER} .
-                            docker push %DOCKER_USER%/${IMAGE_NAME}:${BUILD_NUMBER}
+                            echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                            docker build -t %DOCKER_IMAGE%:${BUILD_NUMBER} -t %DOCKER_IMAGE%:latest .
+                            docker push %DOCKER_IMAGE%:${BUILD_NUMBER}
+                            docker push %DOCKER_IMAGE%:latest
                         """
                     }
                 }
@@ -37,9 +38,10 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    echo "Deploy stage (you can run Docker run command here or update server)."
-                    // Example (if deploying locally):
-                    // bat "docker run -d -p 8081:80 %DOCKER_USER%/${IMAGE_NAME}:${BUILD_NUMBER}"
+                    echo "Deploy stage (customize if you want to run the container)."
+                    // Example for local deployment:
+                    // bat "docker rm -f static-website-p3 || exit 0"
+                    // bat "docker run -d --name static-website-p3 -p 8081:80 %DOCKER_IMAGE%:latest"
                 }
             }
         }
@@ -47,10 +49,10 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline completed successfully ✅'
+            echo '✅ Pipeline completed successfully'
         }
         failure {
-            echo 'Pipeline failed ❌ — check logs.'
+            echo '❌ Pipeline failed — check logs'
         }
     }
 }
