@@ -1,47 +1,43 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    IMAGE_NAME = 'static-website'
-  }
+    environment {
+        DOCKERHUB_USER = 'ankan2004'  // Your DockerHub username
+    }
 
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-        script {
-          // get short commit hash
-          COMMIT = env.GIT_COMMIT ?: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          echo "Commit: ${COMMIT}"
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    def commit = bat(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    echo "Commit: ${commit}"
+                }
+            }
         }
-      }
-    }
 
-    stage('Build & Push Image') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${COMMIT} ."
-          sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
-          sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:${COMMIT}"
-          // also update "latest"
-          sh "docker tag ${DOCKER_USER}/${IMAGE_NAME}:${COMMIT} ${DOCKER_USER}/${IMAGE_NAME}:latest || true"
-          sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:latest || true"
+        stage('Build & Push Image') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        // Login securely
+                        bat """
+                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                        """
+
+                        // Build and tag image
+                        bat """
+                        docker build -t %DOCKER_USER%/static-website-p3:${BUILD_NUMBER} -t %DOCKER_USER%/static-website-p3:latest .
+                        """
+
+                        // Push both tags
+                        bat """
+                        docker push %DOCKER_USER%/static-website-p3:${BUILD_NUMBER}
+                        docker push %DOCKER_USER%/static-website-p3:latest
+                        """
+                    }
+                }
+            }
         }
-      }
     }
-
-    stage('Deploy') {
-      steps {
-        // stop and remove any old container, then run the new one
-        sh "docker rm -f static-site || true"
-        sh "docker run -d --name static-site -p 8080:80 ${DOCKER_USER}/${IMAGE_NAME}:latest"
-      }
-    }
-  }
-
-  post {
-    failure {
-      echo "Pipeline failed — check logs."
-    }
-  }
 }
